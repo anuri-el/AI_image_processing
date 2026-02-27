@@ -41,18 +41,29 @@ def detect_obj(source):
     return annotated_frame
 
 
-def detect_obj_video(vid_path):
-    capture = cv.VideoCapture(vid_path)
+def detect_obj_video(video_path):
+    capture = cv.VideoCapture(video_path)
+
+    width = int(capture.get(cv.CAP_PROP_FRAME_WIDTH))
+    height = int(capture.get(cv.CAP_PROP_FRAME_HEIGHT))
+    fps = capture.get(cv.CAP_PROP_FPS)
+
+    basename = os.path.splitext(os.path.basename(video_path))[0]
+    output_path = f"output/{basename}_out.mp4"
+    fourcc = cv.VideoWriter_fourcc(*"mp4v")
+
+    out = cv.VideoWriter(output_path, fourcc, fps, (width, height))
 
     while capture.isOpened():
         ret, frame = capture.read()
         if ret == False:
-            print("to err is human")
+            break
         
-        frame = resize_frame(frame)
         annotated_frame = detect_obj(frame)
+        out.write(annotated_frame)
+        annotated_frame = resize_frame(annotated_frame)
         cv.imshow("vid", annotated_frame)
-    
+
         if cv.waitKey(1) & 0xFF==ord('q'):
             break
 
