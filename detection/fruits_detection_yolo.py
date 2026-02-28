@@ -4,20 +4,21 @@ from ultralytics import YOLO
 
 
 def main():
-    img_path = "input/fruits/pexels-rachel-claire-5864750.jpg"
+    # img_path = "input/fruits/pexels-rachel-claire-5864750.jpg"
     # img_path = "input/fruits/pexels-viktoria-slowikowska-5677917.jpg"
+    img_path = "input/fruits/a60ae20e20eb2a9d9ede90d2c471b936.jpg"
 
     # vid_path = "input/fruits/8203772-uhd_3840_2160_24fps.mp4"
     # vid_path = "input/fruits/15645011-hd_1920_1080_25fps.mp4"
     vid_path = "input/fruits/14249403_1920_1080_25fps.mp4"
 
-    annotated_img, counts = detect_obj(img_path, conf=0.5, scale=0.3)
+    annotated_img, counts = detect_obj(img_path, conf=0.5, scale=1)
     cv.imshow("detected objects", annotated_img)
     # for label, count in counts.items():
     #     print(f"{label} : {count}")
 
     detect_obj_video(vid_path, conf=0.3, scale=0.3)
-    track_objects(vid_path, conf=0.3, scale=0.3)
+    track_obj(vid_path, conf=0.3, scale=0.3)
 
     cv.waitKey(0)
     cv.destroyAllWindows()
@@ -82,7 +83,7 @@ def detect_obj_video(video_path, conf=0.6, scale=1):
     out.release()
 
 
-def track_objects(video_path, conf=0.6, scale=1):
+def track_obj(video_path, conf=0.6, scale=1):
     model = YOLO("models/yolov8m.pt")
 
     capture = cv.VideoCapture(video_path)
