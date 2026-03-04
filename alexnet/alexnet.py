@@ -1,7 +1,5 @@
 import os
 import time
-import numpy as np
-import matplotlib.pyplot as plt
 
 import tensorflow as tf
 from tensorflow import keras
@@ -10,55 +8,11 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Activation, Dense, Flatten, BatchNormalization, Conv2D, MaxPool2D, Dropout, GlobalAveragePooling2D
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
-# from sklearn.metrics import confusion_matrix
-
 
 
 def main():
-    (train_images, train_labels), (test_images, test_labels) = keras.datasets.cifar10.load_data()
-
-    CLASS_NAMES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
-
-    validation_images, validation_labels = train_images[:5000], train_labels[:5000]
-    train_images, train_labels = train_images[5000:], train_labels[5000:]
-
-    train_ds = Dataset.from_tensor_slices((train_images, train_labels))
-    validation_ds = Dataset.from_tensor_slices((validation_images, validation_labels))
-    test_ds = Dataset.from_tensor_slices((test_images, test_labels))
-
-
-    # plt.figure(figsize=(20,20))
-    # for i, (image, label) in enumerate(train_ds.take(9)):
-    #     plt.subplot(3, 3, i+1)
-    #     plt.imshow(image)
-    #     plt.title(CLASS_NAMES[label.numpy()[0]])
-    #     plt.axis("off")
-
-    # plt.show()
-
-    # train_ds_size = tf.data.experimental.cardinality(train_ds).numpy()
-    # validation_ds_size = tf.data.experimental.cardinality(validation_ds).numpy()
-    # test_ds_size = tf.data.experimental.cardinality(test_ds).numpy()
-
-    # print("train data size:", train_ds_size)
-    # print("validation data size:", validation_ds_size)
-    # print("test data size:", test_ds_size)
-
-    train_ds = (train_ds
-                    .map(process_images)
-                    .shuffle(buffer_size=1000, seed=42, reshuffle_each_iteration=True)
-                    .batch(batch_size=32, drop_remainder=True)
-                    .prefetch(tf.data.AUTOTUNE))
-    validation_ds = (validation_ds
-                        .map(process_images)
-                        .shuffle(buffer_size=1000, seed=42, reshuffle_each_iteration=True)
-                        .batch(batch_size=32, drop_remainder=True)
-                        .prefetch(tf.data.AUTOTUNE))
-    test_ds = (test_ds
-                    .map(process_images)
-                    .shuffle(buffer_size=1000, seed=42, reshuffle_each_iteration=True)
-                    .batch(batch_size=32, drop_remainder=True)
-                    .prefetch(tf.data.AUTOTUNE))
+    (train_images, train_labels), (validation_images, validation_labels), (test_images, test_labels) = get_data()
+    train_ds, validation_ds, test_ds = get_ds(train_images, train_labels, validation_images, validation_labels, test_images, test_labels)
 
     # model = Sequential([
     #     Conv2D(filters=96, kernel_size=(11, 11), strides=(4, 4), activation="relu", input_shape=(227, 227, 3)),
@@ -108,13 +62,46 @@ def main():
 
     run_logdir = get_run_logdir()
     tensorboard_cb = TensorBoard(run_logdir)
+    checkpoint_cb = ModelCheckpoint("alexnet_best.keras", monitor="val_accuracy", save_best_only=True, verbose=1)
 
     model.compile(optimizer=Adam(learning_rate=0.0001), loss="sparse_categorical_crossentropy", metrics=["accuracy"])
     model.summary()
 
-    model.fit(train_ds, validation_data=validation_ds, validation_freq=1, epochs=30, verbose=2, callbacks=[tensorboard_cb])
+    model.fit(train_ds, validation_data=validation_ds, validation_freq=1, epochs=30, callbacks=[tensorboard_cb, checkpoint_cb])
 
-    model.evaluate(test_ds)
+    # model.evaluate(test_ds)
+    model.save("alexnet_final.keras")
+
+
+def get_data():
+    (train_images, train_labels), (test_images, test_labels) = keras.datasets.cifar10.load_data()
+
+    validation_images, validation_labels = train_images[:5000], train_labels[:5000]
+    train_images, train_labels = train_images[5000:], train_labels[5000:]
+
+    return (train_images, train_labels), (validation_images, validation_labels), (test_images, test_labels) 
+
+
+def get_ds(train_images, train_labels, validation_images, validation_labels, test_images, test_labels):
+    train_ds = Dataset.from_tensor_slices((train_images, train_labels))
+    validation_ds = Dataset.from_tensor_slices((validation_images, validation_labels))
+    test_ds = Dataset.from_tensor_slices((test_images, test_labels))
+
+    train_ds = (train_ds
+                    .map(process_images)
+                    .shuffle(buffer_size=1000, seed=42, reshuffle_each_iteration=True)
+                    .batch(batch_size=32)
+                    .prefetch(tf.data.AUTOTUNE))
+    validation_ds = (validation_ds
+                        .map(process_images)
+                        .batch(batch_size=32)
+                        .prefetch(tf.data.AUTOTUNE))
+    test_ds = (test_ds
+                    .map(process_images)
+                    .batch(batch_size=32)
+                    .prefetch(tf.data.AUTOTUNE))
+    
+    return train_ds, validation_ds, test_ds
 
 
 def process_images(image, label):
