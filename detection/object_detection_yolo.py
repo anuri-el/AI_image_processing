@@ -17,8 +17,8 @@ def main():
     # for label, count in counts.items():
     #     print(f"{label} : {count}")
 
-    detect_obj_video(vid_path, conf=0.3, scale=0.3)
-    track_obj(vid_path, conf=0.3, scale=0.3)
+    detect_obj_video(vid_path, conf=0.3, scale=0.7)
+    track_obj(vid_path, conf=0.3, scale=0.7)
 
     cv.waitKey(0)
     cv.destroyAllWindows()

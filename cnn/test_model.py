@@ -5,7 +5,7 @@ import seaborn as sns
 from tensorflow import keras
 from sklearn.metrics import confusion_matrix
 
-from alexnet import get_data, get_ds
+from cnn.cnn import get_data, get_ds
 
 def main():
     CLASS_NAMES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
