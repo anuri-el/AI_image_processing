@@ -2,6 +2,7 @@ import cv2 as cv
 import mediapipe as mp
 import urllib.request
 import threading
+import math
 from pathlib import Path
 
 
@@ -58,6 +59,24 @@ def main():
                     skel_color = (60, 220, 100) if label == "Right" else (220, 180, 60)
                     draw_landmark_connection(frame, pts, skel_color)
 
+                if label == "Right":
+                    thumb = pts[4]
+                    index = pts[8]
+                    dist = distance(thumb, index)
+
+                    line_color = (0, int(220), int(220))
+
+                    cv.line(frame, thumb, index, line_color, 3)
+                    cv.circle(frame, thumb, 10, line_color, -1)
+                    cv.circle(frame, index, 10, line_color, -1)
+
+                    mid = ((thumb[0]+index[0])//2, (thumb[1]+index[1])//2)
+                    cv.putText(frame, f"{dist}%", (mid[0]+12, mid[1]-8), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
+
+                elif label == "Left":
+                    if is_fist(pts, label):
+                        fist_detected = True
+                        cv.circle(frame, pts[0], 24, (0, 80, 220), 3)
 
             cv.imshow("video", frame)
             if cv.waitKey(1) & 0xFF==ord("q"):
@@ -92,6 +111,28 @@ def draw_landmark_connection(frame, pts:list[tuple], color=(0, 220, 120), r=5):
             cv.line(frame, pts[chain[i]], pts[chain[i+1]], color, 2)
     for p in pts:
         cv.circle(frame, p, r, color, -1)
+
+def distance(p1, p2):
+    return math.hypot(p2[0] - p1[0], p2[1] - p1[1])
+
+
+def fingers_up(lm_list, hand_label):
+    TIPS = [4, 8, 12, 16, 20]
+    PIPS = [3, 6, 10, 14, 18]
+
+    up = []
+    if hand_label == "Right":
+        up.append(lm_list[4][0] < lm_list[3][0])
+    else:
+        up.append(lm_list[4][0] > lm_list[3][0])
+    for tip, pip in zip(TIPS[1:], PIPS[1:]):
+        up.append(lm_list[tip][1] < lm_list[pip][1])
+    return up
+
+
+def is_fist(lm_list, hand_label):
+    return not any(fingers_up(lm_list, hand_label))
+
 
 if __name__ == "__main__":
     main()
