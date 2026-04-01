@@ -4,6 +4,9 @@ import urllib.request
 import threading
 import math
 from pathlib import Path
+from ctypes import cast, POINTER
+from comtypes import CLSCTX_ALL
+from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 
 
 BaseOptions = mp.tasks.BaseOptions
@@ -29,6 +32,8 @@ def main():
     cap.set(cv.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, 720)
 
+    current_vol = get_volume()
+    fist_prev = False
 
     with HandLandmarker.create_from_options(options) as detector:
         ts_ms = 0
@@ -59,24 +64,29 @@ def main():
                     skel_color = (60, 220, 100) if label == "Right" else (220, 180, 60)
                     draw_landmark_connection(frame, pts, skel_color)
 
-                if label == "Right":
-                    thumb = pts[4]
-                    index = pts[8]
-                    dist = distance(thumb, index)
+                    if label == "Right":
+                        thumb = pts[4]
+                        index = pts[8]
+                        dist = distance(thumb, index)
 
-                    line_color = (0, int(220), int(220))
+                        vol = (dist - 20) / 200.0
+                        vol = max(0, min(1, vol))
+                        set_volume(vol)
+                        current_vol = vol
 
-                    cv.line(frame, thumb, index, line_color, 3)
-                    cv.circle(frame, thumb, 10, line_color, -1)
-                    cv.circle(frame, index, 10, line_color, -1)
+                        line_color = (0, int(220*(1-vol)+60), int(220*vol))
 
-                    mid = ((thumb[0]+index[0])//2, (thumb[1]+index[1])//2)
-                    cv.putText(frame, f"{dist}%", (mid[0]+12, mid[1]-8), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
+                        cv.line(frame, thumb, index, line_color, 3)
+                        cv.circle(frame, thumb, 10, line_color, -1)
+                        cv.circle(frame, index, 10, line_color, -1)
 
-                elif label == "Left":
-                    if is_fist(pts, label):
-                        fist_detected = True
-                        cv.circle(frame, pts[0], 24, (0, 80, 220), 3)
+                        mid = ((thumb[0]+index[0])//2, (thumb[1]+index[1])//2)
+                        cv.putText(frame, f"{int(vol*100)}%", (mid[0]+12, mid[1]-8), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
+
+                    elif label == "Left":
+                        if is_fist(pts, label):
+                            fist_detected = True
+                            cv.circle(frame, pts[0], 24, (0, 80, 220), 3)
 
             cv.imshow("video", frame)
             if cv.waitKey(1) & 0xFF==ord("q"):
@@ -84,6 +94,36 @@ def main():
 
     cap.release()
     cv.destroyAllWindows()
+
+
+def _activate(device):
+    iface = device.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+    return cast(iface, POINTER(IAudioEndpointVolume))
+
+
+_spk = _activate(AudioUtilities.GetSpeakers())
+
+
+def get_volume():
+    return _spk.GetMasterVolumeLevelScalar()
+
+
+def set_volume(v: float):
+    _spk.SetMasterVolumeLevelScalar(max(0, min(1, v)), None)
+
+
+def get_mic_mute():
+    try:
+        return bool(_activate(AudioUtilities.GetMicrophone()).GetMute())
+    except Exception:
+        return False
+
+
+def set_mic_mute(muted: bool):
+    try:
+        _activate(AudioUtilities.GetMicrophone()).SetMute(int(muted), None)
+    except Exception:
+        pass
 
 
 def ensure_model():
