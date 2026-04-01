@@ -38,6 +38,8 @@ def main():
     fist_prev = False
     fist_cooldown = 0.0
 
+
+
     with HandLandmarker.create_from_options(options) as detector:
         ts_ms = 0
         while True:
@@ -57,6 +59,8 @@ def main():
                 result = _result
 
             fist_detected = False
+            r_hint = "-"
+            l_hint = "-"
 
             if result and result.hand_landmarks:
                 for lm_norm, handedness in zip(result.hand_landmarks, result.handedness):
@@ -74,7 +78,8 @@ def main():
                         vol = (dist - 20) / 200.0
                         vol = max(0, min(1, vol))
                         set_volume(vol)
-                        current_vol = vol
+                        alpha = 0.2
+                        current_vol = current_vol*(1-alpha) + vol*alpha
 
                         line_color = (0, int(220*(1-vol)+60), int(220*vol))
 
@@ -84,11 +89,16 @@ def main():
 
                         mid = ((thumb[0]+index[0])//2, (thumb[1]+index[1])//2)
                         cv.putText(frame, f"{int(vol*100)}%", (mid[0]+12, mid[1]-8), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
+                        r_hint = f"Volume {int(vol*100)}%"
 
                     elif label == "Left":
                         if is_fist(pts, label):
                             fist_detected = True
+                            l_hint = "fist - on/off microphone"
                             cv.circle(frame, pts[0], 24, (0, 80, 220), 3)
+                        else:
+                            n = sum(fingers_up(pts, label))
+                            l_hint = f"fingers up: {n}"
 
             now = time.time()
             if fist_detected and not fist_prev and (now - fist_cooldown) > 0.8:
@@ -99,6 +109,7 @@ def main():
 
             draw_volume_bar(frame, current_vol)
             draw_mic_badge(frame, mic_muted)
+            overlay_hint(frame, h, r_hint, l_hint)
 
             cv.rectangle(frame, (0, 0), (w, 32), (12, 12, 12), -1)
             cv.putText(frame, "Gesture Audio Control", (10, 22), cv.FONT_HERSHEY_SIMPLEX, 0.55, (160, 160, 160), 1)
@@ -209,6 +220,15 @@ def draw_mic_badge(frame, muted: bool, x=30, y=360):
     cv.putText(frame, icon, (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
     cv.putText(frame, label, (x + 18, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
+
+def overlay_hint(frame, h: int, right_txt: str, left_txt: str):
+    bar_y = h - 52
+    cv.rectangle(frame, (0, bar_y), (frame.shape[1], h), (18, 18, 18), -1)
+    cv.putText(frame, f"[R] {right_txt}", (10, bar_y + 20),
+                cv.FONT_HERSHEY_SIMPLEX, 0.5, (80, 200, 80), 1)
+    cv.putText(frame, f"[L] {left_txt}",  (10, bar_y + 40),
+                cv.FONT_HERSHEY_SIMPLEX, 0.5, (80, 200, 220), 1)
+    
 
 if __name__ == "__main__":
     main()
