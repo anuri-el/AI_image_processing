@@ -3,6 +3,7 @@ import mediapipe as mp
 import urllib.request
 import threading
 import math
+import time
 from pathlib import Path
 from ctypes import cast, POINTER
 from comtypes import CLSCTX_ALL
@@ -33,7 +34,9 @@ def main():
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, 720)
 
     current_vol = get_volume()
+    mic_muted = get_mic_mute()
     fist_prev = False
+    fist_cooldown = 0.0
 
     with HandLandmarker.create_from_options(options) as detector:
         ts_ms = 0
@@ -58,7 +61,6 @@ def main():
             if result and result.hand_landmarks:
                 for lm_norm, handedness in zip(result.hand_landmarks, result.handedness):
                     label = handedness[0].category_name
-                    print(label)
                     pts = [(int(p.x * w), int(p.y * h)) for p in lm_norm]
 
                     skel_color = (60, 220, 100) if label == "Right" else (220, 180, 60)
@@ -88,6 +90,14 @@ def main():
                             fist_detected = True
                             cv.circle(frame, pts[0], 24, (0, 80, 220), 3)
 
+            now = time.time()
+            if fist_detected and not fist_prev and (now - fist_cooldown) > 0.8:
+                mic_muted = not mic_muted
+                set_mic_mute(mic_muted)
+                fist_cooldown = now
+                print(f"Мікрофон {'off' if mic_muted else 'on'}")
+            fist_prev = fist_detected
+
             cv.imshow("video", frame)
             if cv.waitKey(1) & 0xFF==ord("q"):
                 break
@@ -102,7 +112,11 @@ def _activate(device):
 
 
 _spk = _activate(AudioUtilities.GetSpeakers())
-
+_mic = None
+try:
+    _mic = _activate(AudioUtilities.GetMicrophone())
+except Exception:
+    pass
 
 def get_volume():
     return _spk.GetMasterVolumeLevelScalar()
@@ -113,17 +127,14 @@ def set_volume(v: float):
 
 
 def get_mic_mute():
-    try:
-        return bool(_activate(AudioUtilities.GetMicrophone()).GetMute())
-    except Exception:
-        return False
+    if _mic:
+        return bool(_mic.GetMute())
+    return False
 
 
 def set_mic_mute(muted: bool):
-    try:
-        _activate(AudioUtilities.GetMicrophone()).SetMute(int(muted), None)
-    except Exception:
-        pass
+    if _mic:
+        _mic.SetMute(int(muted), None)
 
 
 def ensure_model():
@@ -151,6 +162,7 @@ def draw_landmark_connection(frame, pts:list[tuple], color=(0, 220, 120), r=5):
             cv.line(frame, pts[chain[i]], pts[chain[i+1]], color, 2)
     for p in pts:
         cv.circle(frame, p, r, color, -1)
+
 
 def distance(p1, p2):
     return math.hypot(p2[0] - p1[0], p2[1] - p1[1])
