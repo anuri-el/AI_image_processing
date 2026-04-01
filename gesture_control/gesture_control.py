@@ -95,10 +95,14 @@ def main():
                 mic_muted = not mic_muted
                 set_mic_mute(mic_muted)
                 fist_cooldown = now
-                print(f"Мікрофон {'off' if mic_muted else 'on'}")
             fist_prev = fist_detected
 
-            cv.imshow("video", frame)
+            draw_volume_bar(frame, current_vol)
+            draw_mic_badge(frame, mic_muted)
+
+            cv.rectangle(frame, (0, 0), (w, 32), (12, 12, 12), -1)
+            cv.putText(frame, "Gesture Audio Control", (10, 22), cv.FONT_HERSHEY_SIMPLEX, 0.55, (160, 160, 160), 1)
+            cv.imshow("Gesture Audio Control", frame)
             if cv.waitKey(1) & 0xFF==ord("q"):
                 break
 
@@ -148,22 +152,6 @@ def _on_result(result: HandLandmarkerResult, _img: mp.Image, _ts: int):
         _result = result
 
 
-def draw_landmark_connection(frame, pts:list[tuple], color=(0, 220, 120), r=5):
-    chains = [
-        [0,1,2,3,4],
-        [0,5,6,7,8],
-        [9,10,11,12],
-        [13,14,15,16],
-        [0,17,18,19,20],
-        [5,9,13,17],
-    ]
-    for chain in chains:
-        for i in range(len(chain) - 1):
-            cv.line(frame, pts[chain[i]], pts[chain[i+1]], color, 2)
-    for p in pts:
-        cv.circle(frame, p, r, color, -1)
-
-
 def distance(p1, p2):
     return math.hypot(p2[0] - p1[0], p2[1] - p1[1])
 
@@ -184,6 +172,42 @@ def fingers_up(lm_list, hand_label):
 
 def is_fist(lm_list, hand_label):
     return not any(fingers_up(lm_list, hand_label))
+
+
+def draw_landmark_connection(frame, pts:list[tuple], color=(0, 220, 120), r=5):
+    chains = [
+        [0,1,2,3,4],
+        [0,5,6,7,8],
+        [9,10,11,12],
+        [13,14,15,16],
+        [0,17,18,19,20],
+        [5,9,13,17],
+    ]
+    for chain in chains:
+        for i in range(len(chain) - 1):
+            cv.line(frame, pts[chain[i]], pts[chain[i+1]], color, 2)
+    for p in pts:
+        cv.circle(frame, p, r, color, -1)
+
+
+def draw_volume_bar(frame, vol: float, x=30, y=100, w=28, h=230):
+    cv.rectangle(frame, (x, y), (x + w, y + h), (50, 50, 50), 1)
+    filled = int(h * vol)
+    color = (0, int(200 * (1 - vol) + 60), int(200 * vol))
+    cv.rectangle(frame, (x, y + h - filled), (x + w, y + h), color, -1)
+    cv.rectangle(frame, (x, y), (x + w, y + h), (220, 220, 220), 1)
+    cv.putText(frame, "VOL", (x , y - 8), cv.FONT_HERSHEY_SIMPLEX, 0.45, (220, 220, 220), 1)
+    cv.putText(frame, f"{int(vol*100)}%", (x - 2 , y + h + 20), cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 220, 220), 1)
+
+
+def draw_mic_badge(frame, muted: bool, x=30, y=360):
+    color = (40, 40, 220) if muted else (40, 200, 60)
+    label = "MIC OFF" if muted else "MIC ON"
+    icon = "x" if muted else "o"
+    cv.rectangle(frame, (x - 4, y - 24), (x + 118, y + 6), (25, 25, 25), -1)
+    cv.rectangle(frame, (x - 4, y - 24), (x + 118, y + 6), color, 1)
+    cv.putText(frame, icon, (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+    cv.putText(frame, label, (x + 18, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
 
 if __name__ == "__main__":
